@@ -95,7 +95,7 @@ export function generateOrderId(): string {
 export function parseSearchParams(searchParams: URLSearchParams) {
   const params: Record<string, any> = {};
   
-  for (const [key, value] of searchParams.entries()) {
+  searchParams.forEach((value, key) => {
     // Try to parse as number
     if (!isNaN(Number(value)) && value !== '') {
       params[key] = Number(value);
@@ -108,7 +108,7 @@ export function parseSearchParams(searchParams: URLSearchParams) {
     else {
       params[key] = value;
     }
-  }
+  });
   
   return params;
 }
