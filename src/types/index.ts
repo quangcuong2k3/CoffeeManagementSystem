@@ -348,8 +348,8 @@ export interface ProductFormData {
   category: 'coffee' | 'bean';
   prices: ProductPrice[];
   images: {
-    square: File | string;
-    portrait: File | string;
+    square: string;
+    portrait: string;
   };
 }
 
@@ -369,4 +369,40 @@ export interface InventoryFormData {
   location: string;
   stockLevels: StockLevel[];
   notes?: string;
+}
+
+// Stock Forecasting Types
+export type ForecastPeriod = 'weekly' | 'monthly' | 'quarterly';
+
+export interface StockForecast {
+  id: string;
+  productId: string;
+  productName: string;
+  period: ForecastPeriod;
+  currentStock: number;
+  projectedStock: number;
+  predictedSales: number;
+  daysUntilStockout: number;
+  reorderRecommendation: boolean;
+  recommendedOrderQuantity: number;
+  confidenceLevel: number;
+  factors: ForecastFactor[];
+  lastUpdated: Date;
+  createdAt: Date;
+}
+
+export interface ForecastFactor {
+  name: string;
+  impact: number;
+  description: string;
+}
+
+export interface SalesVelocity {
+  productId: string;
+  productName: string;
+  current: number;
+  previous: number;
+  change: number;
+  trend: 'increasing' | 'decreasing' | 'stable';
+  period: ForecastPeriod;
 }
