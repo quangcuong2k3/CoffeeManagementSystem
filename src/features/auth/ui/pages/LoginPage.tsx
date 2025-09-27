@@ -1,22 +1,50 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../../../../shared/components/ui/button';
 import { Input } from '../../../../shared/components/ui/input';
 import { useAuth } from '@/infra/api/hooks/authHooks';
 import { Coffee, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
-  const { login, isLoading, error } = useAuth();
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const { login, isLoading, error, isAuthenticated } = useAuth();
+  const router = useRouter();
+
+  // Redirect to dashboard if already authenticated or after successful login
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      setIsRedirecting(true);
+      
+      // Immediate redirect with fallback
+      const redirect = () => {
+        try {
+          window.location.href = '/dashboard';
+        } catch (error) {
+          console.error('Redirect failed, using router:', error);
+          router.push('/dashboard');
+        }
+      };
+      
+      // Small delay for UX, then redirect
+      const timer = setTimeout(redirect, 800);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsRedirecting(false); // Reset redirect state
     try {
       await login(formData);
+      // The redirect will happen via the useEffect above when isAuthenticated becomes true
     } catch (err) {
       console.error('Login failed:', err);
+      setIsRedirecting(false); // Reset redirect state on error
     }
   };
 
@@ -50,6 +78,13 @@ export default function LoginPage() {
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
               <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          )}
+
+          {isRedirecting && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+              <p className="text-green-700 text-sm">Login successful! Redirecting to dashboard...</p>
             </div>
           )}
 
@@ -100,10 +135,10 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              disabled={isLoading || !formData.email || !formData.password}
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              disabled={isLoading || isRedirecting || !formData.email || !formData.password}
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isRedirecting ? 'Redirecting...' : isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
 
