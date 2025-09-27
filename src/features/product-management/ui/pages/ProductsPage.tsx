@@ -6,10 +6,14 @@ import { Input } from '../../../../shared/components/ui/input';
 import { Badge } from '../../../../shared/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../shared/ui/card';
 import { LoadingSpinner } from '../../../../shared/ui/loading';
+import { FirebaseImage } from '../../../../shared/ui/firebase-image';
 import { useProducts } from '../../../../infra/api/hooks/productHooks';
-// import { AddProductModal } from '../components/AddProductModal';
+import { AddEditProductModal } from '../components/AddEditProductModal';
+import { ProductDetailModal } from '../components/ProductDetailModal';
+import { DeleteProductModal } from '../components/DeleteProductModal';
 import { Product } from '../../../../entities/product/types';
 import { cn } from '../../../../core/utils/cn';
+import { formatPrice, formatCurrencySimple } from '../../../../shared/lib/currency';
 import { 
   Plus, 
   Search, 
@@ -36,9 +40,17 @@ type SortBy = 'name' | 'category' | 'price' | 'created';
 export default function ProductsPage() {
   const { products, loading, error, fetchProducts, createProduct, updateProduct, deleteProduct } = useProducts();
   const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Modal states
+  const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  
+  // View states
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('name');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -50,13 +62,23 @@ export default function ProductsPage() {
   const handleAddProduct = () => {
     setEditingProduct(null);
     setModalMode('add');
-    setIsModalOpen(true);
+    setIsAddEditModalOpen(true);
   };
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setModalMode('edit');
-    setIsModalOpen(true);
+    setIsAddEditModalOpen(true);
+  };
+
+  const handleViewProduct = (product: Product) => {
+    setSelectedProduct(product);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleDeleteProduct = (product: Product) => {
+    setSelectedProduct(product);
+    setIsDeleteModalOpen(true);
   };
 
   const handleSaveProduct = async (productData: any) => {
@@ -66,25 +88,30 @@ export default function ProductsPage() {
       } else if (editingProduct) {
         await updateProduct(editingProduct.id, productData);
       }
-      setIsModalOpen(false);
+      setIsAddEditModalOpen(false);
       setEditingProduct(null);
     } catch (err) {
       console.error('Failed to save product:', err);
     }
   };
 
-  const handleDeleteProduct = async (productId: string) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      try {
-        await deleteProduct(productId);
-      } catch (err) {
-        console.error('Failed to delete product:', err);
-      }
+  const handleConfirmDelete = async () => {
+    if (!selectedProduct) return;
+    
+    setDeleteLoading(true);
+    try {
+      await deleteProduct(selectedProduct.id);
+      setIsDeleteModalOpen(false);
+      setSelectedProduct(null);
+    } catch (err) {
+      console.error('Failed to delete product:', err);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
   // Enhanced filtering and sorting
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = products.filter((product: Product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -119,10 +146,7 @@ export default function ProductsPage() {
   }, 0);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+    return formatCurrencySimple(amount, 'USD');
   };
 
   const getProductMainPrice = (product: Product) => {
@@ -368,7 +392,12 @@ export default function ProductsPage() {
                         <Coffee className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <Button variant="ghost" size="sm" className="p-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="p-2"
+                          onClick={() => handleViewProduct(product)}
+                        >
                           <Eye className="w-4 h-4" />
                         </Button>
                         <Button 
@@ -383,7 +412,7 @@ export default function ProductsPage() {
                           variant="ghost" 
                           size="sm" 
                           className="p-2 text-red-600 hover:text-red-700"
-                          onClick={() => handleDeleteProduct(product.id)}
+                          onClick={() => handleDeleteProduct(product)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -417,7 +446,7 @@ export default function ProductsPage() {
                             Size {price.size}:
                           </span>
                           <span className="font-semibold text-gray-900 dark:text-white">
-                            {formatCurrency(parseFloat(price.price))}
+                            {formatPrice(price.price, price.currency)}
                           </span>
                         </div>
                       ))}
@@ -457,7 +486,7 @@ export default function ProductsPage() {
                               {price.size}:
                             </span>
                             <span className="font-semibold text-gray-900 dark:text-white">
-                              {formatCurrency(parseFloat(price.price))}
+                              {formatPrice(price.price, price.currency)}
                             </span>
                           </div>
                         ))}
@@ -465,7 +494,12 @@ export default function ProductsPage() {
                     </div>
 
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <Button variant="ghost" size="sm" className="p-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-2"
+                        onClick={() => handleViewProduct(product)}
+                      >
                         <Eye className="w-4 h-4" />
                       </Button>
                       <Button 
@@ -480,7 +514,7 @@ export default function ProductsPage() {
                         variant="ghost" 
                         size="sm" 
                         className="p-2 text-red-600 hover:text-red-700"
-                        onClick={() => handleDeleteProduct(product.id)}
+                        onClick={() => handleDeleteProduct(product)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -494,13 +528,41 @@ export default function ProductsPage() {
       )}
 
       {/* Add/Edit Product Modal */}
-      {/* <AddProductModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+      <AddEditProductModal
+        isOpen={isAddEditModalOpen}
+        onClose={() => setIsAddEditModalOpen(false)}
         onSave={handleSaveProduct}
         product={editingProduct}
         mode={modalMode}
-      /> */}
+      />
+
+      {/* Product Detail Modal */}
+      <ProductDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        product={selectedProduct}
+        onEdit={() => {
+          if (selectedProduct) {
+            setIsDetailModalOpen(false);
+            handleEditProduct(selectedProduct);
+          }
+        }}
+        onDelete={() => {
+          if (selectedProduct) {
+            setIsDetailModalOpen(false);
+            handleDeleteProduct(selectedProduct);
+          }
+        }}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteProductModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        product={selectedProduct}
+        isLoading={deleteLoading}
+      />
     </div>
   );
 }
