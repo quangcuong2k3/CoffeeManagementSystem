@@ -19,6 +19,10 @@ export * from './product';
 // Inventory Entity
 export * from './inventory';
 
+export * from './product';
+
+export * from './user';
+
 // Placeholder for future entities
 // export * from './order';
 // export * from './user';

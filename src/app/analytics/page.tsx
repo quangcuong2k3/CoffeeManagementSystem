@@ -1,6 +1,6 @@
 'use client';
 
-import { Navigation } from '../../shared/components/layout/NavigationEnhanced';
+import { Navigation } from '@/shared/components';
 import { BarChart3, TrendingUp, DollarSign, Users, Calendar } from 'lucide-react';
 import { Card, CardContent } from '../../shared/ui/card';
 import { Button } from '../../shared/ui/button';

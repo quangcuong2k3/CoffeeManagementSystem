@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { Navigation } from '../../shared/components/layout/NavigationEnhanced';
+import { Navigation } from '@/shared/components';
 import { Settings, Save, User, Shield, Palette, Bell } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/card';
 import { Button } from '../../shared/ui/button';
