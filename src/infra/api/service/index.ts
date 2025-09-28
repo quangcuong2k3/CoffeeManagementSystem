@@ -8,7 +8,11 @@
 export { AdminService } from './adminService';
 export { ProductService } from './productService';  
 export { InventoryService } from './inventoryService';
+export { OrderService } from './orderService';
 export { FirebaseStorageService, firebaseStorageService } from './firebaseStorageService';
+export { UserService } from './userService';
+export { UserPreferencesService } from './userPreferencesService';
+export { UserOrderService } from './userOrderService';
 
 // Create service instances for easy consumption
 import { AdminService } from './adminService';

@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuthContext } from '../../../infra/api/hooks/authHooks';
+import { useRouter } from 'next/navigation';
 import { Button } from '../ui/button';
 import { Badge } from '../ui';
 import { cn } from '../../../core/utils/cn';
@@ -18,7 +20,14 @@ import {
   X,
   Bell,
   Search,
-  User
+  User,
+  LogOut,
+  Moon,
+  Sun,
+  ChevronDown,
+  Home,
+  HelpCircle,
+  Zap
 } from 'lucide-react';
 
 const navigation = [
@@ -26,19 +35,22 @@ const navigation = [
     name: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    description: 'Overview and analytics'
+    description: 'Overview and analytics',
+    isActive: true
   },
   {
     name: 'Products',
     href: '/products',
     icon: Package,
-    description: 'Product & inventory management'
+    description: 'Product & inventory management',
+    badge: '45'
   },
   {
     name: 'Orders',
     href: '/orders',
     icon: ShoppingCart,
-    description: 'Order management system'
+    description: 'Order management system',
+    badge: '12'
   },
   {
     name: 'Customers',
@@ -66,98 +78,218 @@ interface NavigationProps {
 
 export function Navigation({ children }: NavigationProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState(3);
   const pathname = usePathname();
+  const { user, logout } = useAuthContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check for saved theme preference
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        setIsDarkMode(true);
+        document.documentElement.classList.add('dark');
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    
+    if (newTheme) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       {/* Mobile sidebar overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden transition-opacity duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-800 shadow-xl transform transition-all duration-300 ease-in-out lg:translate-x-0 border-r border-gray-200 dark:border-gray-700",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}>
         {/* Sidebar header */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-amber-500 to-orange-600">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center">
-              <Coffee className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+              <Coffee className="w-6 h-6 text-amber-600" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">Coffee House</h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Management</p>
+              <h1 className="text-xl font-bold text-white">Coffee House</h1>
+              <p className="text-xs text-amber-100">Management System</p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            className="lg:hidden"
+            className="lg:hidden text-white hover:bg-white/20"
             onClick={() => setIsSidebarOpen(false)}
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </Button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors",
-                  isActive
-                    ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                )}
-                onClick={() => setIsSidebarOpen(false)}
-              >
-                <item.icon className="w-5 h-5" />
-                <div className="flex-1">
-                  <div>{item.name}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {item.description}
+        {/* Navigation menu */}
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          <div className="space-y-1">
+            {navigation.map((item) => {
+              const IconComponent = item.icon;
+              const isActive = pathname === item.href;
+              
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "group flex items-center justify-between px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200",
+                    isActive
+                      ? "bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 text-amber-700 dark:text-amber-300 shadow-sm border border-amber-200 dark:border-amber-800"
+                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-white"
+                  )}
+                  onClick={() => setIsSidebarOpen(false)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200",
+                      isActive 
+                        ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" 
+                        : "group-hover:bg-gray-100 dark:group-hover:bg-gray-600"
+                    )}>
+                      <IconComponent className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">
+                        {item.description}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                {isActive && (
-                  <div className="w-2 h-2 bg-amber-600 rounded-full" />
-                )}
-              </Link>
-            );
-          })}
-        </nav>
+                  
+                  {item.badge && (
+                    <Badge 
+                      variant={isActive ? "default" : "secondary"}
+                      className={cn(
+                        "text-xs px-2 py-0.5",
+                        isActive && "bg-amber-600 text-white"
+                      )}
+                    >
+                      {item.badge}
+                    </Badge>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
 
-        {/* Sidebar footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                Admin User
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                admin@tdmu.lqc.com
-              </p>
+          {/* Quick Actions */}
+          <div className="pt-6 mt-6 border-t border-gray-200 dark:border-gray-700">
+            <p className="px-4 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
+              Quick Actions
+            </p>
+            <div className="space-y-1">
+              <Button
+                variant="ghost"
+                className="w-full justify-start px-4 py-3 h-auto text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+              >
+                <Zap className="w-4 h-4 mr-3 text-emerald-500" />
+                <div className="text-left">
+                  <p>Add Product</p>
+                  <p className="text-xs text-gray-500">Create new item</p>
+                </div>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                className="w-full justify-start px-4 py-3 h-auto text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+              >
+                <HelpCircle className="w-4 h-4 mr-3 text-blue-500" />
+                <div className="text-left">
+                  <p>Help Center</p>
+                  <p className="text-xs text-gray-500">Get support</p>
+                </div>
+              </Button>
             </div>
           </div>
+        </nav>
+
+        {/* User profile section */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-gray-700 shadow-sm">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold">
+              {user?.name?.[0] || 'A'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                {user?.name || 'Admin User'}
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                {user?.email || 'admin@coffeehouse.com'}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            >
+              <ChevronDown className={cn(
+                "w-4 h-4 transition-transform duration-200",
+                isUserMenuOpen && "rotate-180"
+              )} />
+            </Button>
+          </div>
+          
+          {isUserMenuOpen && (
+            <div className="mt-2 py-2 bg-white dark:bg-gray-700 rounded-xl shadow-lg border border-gray-200 dark:border-gray-600">
+              <Button
+                variant="ghost"
+                onClick={toggleTheme}
+                className="w-full justify-start px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+              >
+                {isDarkMode ? <Sun className="w-4 h-4 mr-3" /> : <Moon className="w-4 h-4 mr-3" />}
+                {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+              </Button>
+              
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="w-full justify-start px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <LogOut className="w-4 h-4 mr-3" />
+                Sign Out
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Main content */}
-      <div className="lg:ml-64">
+      <div className="lg:ml-72">
         {/* Top navigation */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between h-16 px-4 sm:px-6">
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between h-16 px-6">
             {/* Mobile menu button */}
             <Button
               variant="ghost"
@@ -168,39 +300,54 @@ export function Navigation({ children }: NavigationProps) {
               <Menu className="w-5 h-5" />
             </Button>
 
+            {/* Breadcrumbs */}
+            <div className="hidden lg:flex items-center gap-2 text-sm">
+              <Home className="w-4 h-4 text-gray-400" />
+              <span className="text-gray-400">/</span>
+              <span className="text-gray-600 dark:text-gray-300 capitalize">
+                {pathname.split('/').pop() || 'dashboard'}
+              </span>
+            </div>
+
             {/* Search bar */}
-            <div className="flex-1 max-w-md mx-4">
+            <div className="flex-1 max-w-md mx-6">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search..."
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
+                  placeholder="Search products, orders, customers..."
+                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-transparent transition-all duration-200"
                 />
               </div>
             </div>
 
             {/* Right side */}
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" className="relative">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="relative hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl"
+              >
                 <Bell className="w-5 h-5" />
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs p-0"
-                >
-                  3
-                </Badge>
+                {notifications > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs p-0 animate-pulse"
+                  >
+                    {notifications}
+                  </Badge>
+                )}
               </Button>
               
-              <Button variant="ghost" size="sm">
-                <User className="w-5 h-5" />
-              </Button>
+              <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold text-sm cursor-pointer hover:scale-105 transition-transform duration-200">
+                {user?.name?.[0] || 'A'}
+              </div>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1">
+        <main className="min-h-[calc(100vh-4rem)]">
           {children}
         </main>
       </div>
