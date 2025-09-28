@@ -45,7 +45,7 @@ import {
   SelectValue 
 } from '../../../../shared/ui/select';
 
-import { useOrders,useOrderStats } from '@/infra/api/hooks/orderHook';
+import { useOrders,useOrderStats } from '@/infra/api/hooks';
 import { Order, OrderStatus, PaymentStatus, OrderFilters } from '../../../../entities/order';
 import { formatPrice } from '../../../../shared/lib/currency';
 import OrderDetailModal from '../components/OrderDetailModal';
