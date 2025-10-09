@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthContext } from '../../../infra/api/hooks/authHooks';
@@ -27,8 +27,10 @@ import {
   ChevronDown,
   Home,
   HelpCircle,
-  Zap
+  Zap,
+  Keyboard
 } from 'lucide-react';
+import { useNotifications } from '@/infra/api/hooks/notificationsHooks';
 
 const navigation = [
   {
@@ -80,10 +82,14 @@ export function Navigation({ children }: NavigationProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState(3);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const pathname = usePathname();
   const { user, logout } = useAuthContext();
   const router = useRouter();
+  const { items: notificationItems, unreadCount } = useNotifications();
 
   useEffect(() => {
     // Check for saved theme preference
@@ -97,6 +103,24 @@ export function Navigation({ children }: NavigationProps) {
       }
     }
   }, []);
+
+  useEffect(() => {
+    // Keyboard shortcuts
+    const onKey = (e: KeyboardEvent) => {
+      // Focus search with '/'
+      if (e.key === '/' && (e.target as HTMLElement)?.tagName !== 'INPUT' && (e.target as HTMLElement)?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Open global search page with Cmd/Ctrl+K
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        router.push('/search');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [router]);
 
   const toggleTheme = () => {
     const newTheme = !isDarkMode;
@@ -114,6 +138,14 @@ export function Navigation({ children }: NavigationProps) {
   const handleLogout = async () => {
     await logout();
     router.push('/');
+  };
+
+  const submitSearch = () => {
+    const q = searchTerm.trim();
+    if (q) {
+      router.push(`/search?q=${encodeURIComponent(q)}`);
+      setSearchTerm('');
+    }
   };
 
   return (
@@ -314,34 +346,72 @@ export function Navigation({ children }: NavigationProps) {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
+                  ref={searchInputRef as any}
                   type="text"
-                  placeholder="Search products, orders, customers..."
-                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-transparent transition-all duration-200"
+                  placeholder="Search products, orders, customers"
+                  className="w-full pl-10 pr-16 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-transparent transition-all duration-200"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitSearch(); }}
                 />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-1 text-[10px] text-gray-400">
+                  <Keyboard className="w-3.5 h-3.5" />
+                  <span>Ctrl/⌘ + K</span>
+                </div>
               </div>
             </div>
 
             {/* Right side */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 relative">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className="relative hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl"
+                onClick={() => setNotificationsOpen((v) => !v)}
               >
                 <Bell className="w-5 h-5" />
-                {notifications > 0 && (
+                {unreadCount > 0 && (
                   <Badge 
                     variant="destructive" 
                     className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs p-0 animate-pulse"
                   >
-                    {notifications}
+                    {unreadCount}
                   </Badge>
                 )}
               </Button>
+              {notificationsOpen && (
+                <div className="absolute right-0 top-12 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-2 z-40">
+                  <div className="px-2 py-1 text-sm font-semibold">Notifications</div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notificationItems.length === 0 && (
+                      <div className="p-3 text-sm text-gray-500">No notifications</div>
+                    )}
+                    {notificationItems.map((n) => (
+                      <div key={n.id} className="p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <div className="text-sm font-medium">{n.title}</div>
+                        <div className="text-xs text-gray-500 mt-1">{n.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
-              <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold text-sm cursor-pointer hover:scale-105 transition-transform duration-200">
+              <div
+                className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold text-sm cursor-pointer hover:scale-105 transition-transform duration-200"
+                onClick={() => setUserMenuOpen((v) => !v)}
+              >
                 {user?.name?.[0] || 'A'}
               </div>
+              {userMenuOpen && (
+                <div className="absolute right-0 top-12 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl py-2 z-40">
+                  <button onClick={toggleTheme} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+                    {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                  </button>
+                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                    Sign Out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

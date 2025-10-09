@@ -24,19 +24,4 @@ export const firestore = getFirestore(app);
 export const storage = getStorage(app);
 export const realtimeDb = getDatabase(app);
 
-// Connect to Firebase emulators in development
-if (process.env.NODE_ENV === 'development') {
-  // Uncomment these lines if you want to use Firebase emulators
-  /*
-  try {
-    connectAuthEmulator(auth, 'http://localhost:9099');
-    connectFirestoreEmulator(firestore, 'localhost', 8080);
-    connectStorageEmulator(storage, 'localhost', 9199);
-    connectDatabaseEmulator(realtimeDb, 'localhost', 9000);
-  } catch (error) {
-    console.log('Emulators already connected or not available');
-  }
-  */
-}
-
 export default app;

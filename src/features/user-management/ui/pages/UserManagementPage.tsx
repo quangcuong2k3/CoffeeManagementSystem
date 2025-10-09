@@ -54,6 +54,7 @@ import { User, UserFilters, UserStatus, AccountType } from '../../../../entities
 import { formatPrice } from '../../../../shared/lib/currency';
 import UserDetailModal from '../components/UserDetailModal';
 import UserCreateModal from '../components/UserCreateModal';
+import { toCsv, downloadCsv } from '../../../../shared/lib/csv';
 
 const UserManagementPage: React.FC = () => {
   // State management with optimizations
@@ -215,6 +216,44 @@ const UserManagementPage: React.FC = () => {
     setSearchTerm(value);
   }, []);
 
+  const handleExport = useCallback(() => {
+    try {
+      const rows = processedUsers.map((u: any) => ({
+        id: u.id,
+        name: u.displayName || '',
+        email: u.email || '',
+        phone: u.phoneNumber || '',
+        status: u.status || '',
+        accountType: u.accountType || '',
+        totalOrders: u.totalOrders || 0,
+        totalSpent: u.totalSpent || 0,
+        loyaltyPoints: u.loyaltyPoints || 0,
+        joinedAt: u.createdAt ? new Date(u.createdAt) : null,
+        lastActive: u.lastActiveDate ? new Date(u.lastActiveDate) : null
+      }));
+
+      const columns = [
+        { key: 'id', header: 'ID' },
+        { key: 'name', header: 'Name' },
+        { key: 'email', header: 'Email' },
+        { key: 'phone', header: 'Phone' },
+        { key: 'status', header: 'Status' },
+        { key: 'accountType', header: 'Account Type' },
+        { key: 'totalOrders', header: 'Total Orders' },
+        { key: 'totalSpent', header: 'Total Spent', format: (v: any) => String(v) },
+        { key: 'loyaltyPoints', header: 'Loyalty Points' },
+        { key: 'joinedAt', header: 'Joined At', format: (v: any) => v ? new Date(v).toISOString() : '' },
+        { key: 'lastActive', header: 'Last Active', format: (v: any) => v ? new Date(v).toISOString() : '' },
+      ] as any;
+
+      const csv = toCsv(rows, columns);
+      const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+      downloadCsv(`users-export-${stamp}.csv`, csv);
+    } catch (e) {
+      console.error('Failed to export users:', e);
+    }
+  }, [processedUsers]);
+
   // Debounced filter application
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -256,19 +295,11 @@ const UserManagementPage: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3 flex-wrap">
-            <Button
-              variant="outline"
-              onClick={handleRefresh}
-              className="flex items-center gap-2 hover:bg-slate-50 border-slate-200"
-              disabled={loading}
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
             
             <Button
               variant="outline"
               className="flex items-center gap-2 hover:bg-slate-50 border-slate-200"
+              onClick={handleExport}
             >
               <Download className="w-4 h-4" />
               Export
