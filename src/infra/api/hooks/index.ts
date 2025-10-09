@@ -9,6 +9,6 @@
 export { useAuth, useLoginForm } from './authHooks';
 export { useProducts } from './productHooks';
 export { useInventory } from './inventoryHooks';
-export { useOrders, useOrderStats } from './orderHook';
+export { useOrders, useOrderStats } from './OrderHook';
 export { useGlobalSearch } from './searchHooks';
 export { useNotifications } from './notificationsHooks';
