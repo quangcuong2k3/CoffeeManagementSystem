@@ -13,7 +13,9 @@ export { FirebaseStorageService, firebaseStorageService } from './firebaseStorag
 export { UserService } from './userService';
 export { UserPreferencesService } from './userPreferencesService';
 export { UserOrderService } from './userOrderService';
+export { DashboardService } from './dashboardService';
 export { SearchService } from './searchServices';
+export { reviewService } from './reviewService';
 
 // Create service instances for easy consumption
 import { AdminService } from './adminService';
