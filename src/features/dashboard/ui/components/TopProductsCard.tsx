@@ -15,103 +15,52 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../../shared/ui/
 import { Button } from '../../../../shared/ui/button';
 import { Badge } from '../../../../shared/ui/badge';
 import { cn } from '../../../../core/utils/cn';
+import { useTopProducts } from '../../../../infra/api/hooks/dashboardHooks';
+import { productService } from '../../../../infra/api/service';
+import { Product } from '../../../../entities/product/types';
+import { ProductDetailModal } from '../../../product-management/ui/components/ProductDetailModal';
 
-interface Product {
-  id: string;
-  name: string;
-  category: string;
-  sales: number;
-  revenue: number;
-  growth: number;
-  rating: number;
-  image: string;
-  rank: number;
-}
-
-type SortBy = 'sales' | 'revenue' | 'growth' | 'rating';
+type SortBy = 'sales' | 'revenue' | 'change';
 
 const TopProductsCard: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortBy>('sales');
+  const { products, loading, error } = useTopProducts(5);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [loadingProduct, setLoadingProduct] = useState(false);
 
-  // Mock data - replace with real data from your API
-  const products: Product[] = [
-    {
-      id: '1',
-      name: 'Colombian Supremo',
-      category: 'Coffee Beans',
-      sales: 156,
-      revenue: 2340,
-      growth: 15.2,
-      rating: 4.8,
-      image: '☕',
-      rank: 1
-    },
-    {
-      id: '2',
-      name: 'Cappuccino Premium',
-      category: 'Hot Beverages',
-      sales: 134,
-      revenue: 2010,
-      growth: 12.8,
-      rating: 4.7,
-      image: '☕',
-      rank: 2
-    },
-    {
-      id: '3',
-      name: 'Ethiopian Yirgacheffe',
-      category: 'Coffee Beans',
-      sales: 98,
-      revenue: 1764,
-      growth: 18.5,
-      rating: 4.9,
-      image: '☕',
-      rank: 3
-    },
-    {
-      id: '4',
-      name: 'Iced Americano',
-      category: 'Cold Beverages',
-      sales: 87,
-      revenue: 1305,
-      growth: 8.3,
-      rating: 4.5,
-      image: '🧊',
-      rank: 4
-    },
-    {
-      id: '5',
-      name: 'Espresso Blend',
-      category: 'Coffee Beans',
-      sales: 76,
-      revenue: 1140,
-      growth: 22.1,
-      rating: 4.6,
-      image: '☕',
-      rank: 5
+  const handleProductClick = async (productId: string) => {
+    setLoadingProduct(true);
+    try {
+      const product = await productService.getProductById(productId);
+      if (product) {
+        setSelectedProduct(product);
+        setIsDetailModalOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to load product:', error);
+    } finally {
+      setLoadingProduct(false);
     }
-  ];
+  };
 
-  const sortedProducts = [...products].sort((a, b) => {
+  const sortedProducts = [...(products || [])].sort((a, b) => {
     switch (sortBy) {
       case 'sales':
-        return b.sales - a.sales;
+        return (b.sales || 0) - (a.sales || 0);
       case 'revenue':
-        return b.revenue - a.revenue;
-      case 'growth':
-        return b.growth - a.growth;
-      case 'rating':
-        return b.rating - a.rating;
+        return (b.revenue || 0) - (a.revenue || 0);
+      case 'change':
+        return (b.changePercentage || 0) - (a.changePercentage || 0);
       default:
         return 0;
     }
-  });
+  }).map((product, index) => ({ ...product, rank: index + 1 }));
 
   const sortOptions = [
     { key: 'sales' as SortBy, label: 'Sales', icon: ShoppingCart },
     { key: 'revenue' as SortBy, label: 'Revenue', icon: TrendingUp },
-    { key: 'growth' as SortBy, label: 'Growth', icon: Award },
-    { key: 'rating' as SortBy, label: 'Rating', icon: Star }
+    { key: 'change' as SortBy, label: 'Change', icon: Award }
   ];
 
   const getRankIcon = (rank: number) => {
@@ -190,87 +139,123 @@ const TopProductsCard: React.FC = () => {
       </CardHeader>
       
       <CardContent>
-        <div className="space-y-3">
-          {sortedProducts.map((product, index) => (
-            <div
-              key={product.id}
-              className={cn(
-                "relative p-4 rounded-lg border bg-gradient-to-r transition-all duration-200 hover:shadow-md cursor-pointer group",
-                getRankColor(product.rank)
-              )}
-            >
-              <div className="flex items-center gap-4">
-                {/* Rank & Product Image */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center">
-                    {getRankIcon(product.rank)}
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="p-4 rounded-lg border bg-gray-50 dark:bg-gray-700/30 animate-pulse">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-lg"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-1/2"></div>
                   </div>
-                  <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center text-lg">
-                    {product.image}
+                  <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-16"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-16"></div>
                   </div>
-                </div>
-                
-                {/* Product Info */}
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
-                    {product.name}
-                  </h4>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    {product.category}
-                  </p>
-                  
-                  {/* Rating */}
-                  <div className="flex items-center gap-1 mt-1">
-                    <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                    <span className="text-xs text-gray-600 dark:text-gray-400">
-                      {product.rating}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Metrics */}
-                <div className="text-right">
-                  <div className="space-y-1">
-                    <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Sales</p>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">
-                        {product.sales}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Revenue</p>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">
-                        {formatCurrency(product.revenue)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Growth Badge */}
-                <div className="flex flex-col items-end gap-1">
-                  <Badge 
-                    variant={product.growth >= 0 ? "default" : "destructive"}
-                    className="text-xs"
-                  >
-                    {product.growth >= 0 ? '+' : ''}{product.growth}%
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto"
-                  >
-                    <Eye className="w-3 h-3" />
-                  </Button>
                 </div>
               </div>
-              
-              {/* Hover overlay for top 3 */}
-              {product.rank <= 3 && (
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-white/10 dark:via-gray-800/5 dark:to-gray-800/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg pointer-events-none" />
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-red-600 mb-2">Failed to load top products</p>
+            <p className="text-xs text-gray-500">{error}</p>
+          </div>
+        ) : sortedProducts.length === 0 ? (
+          <div className="text-center py-8">
+            <Coffee className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No product data available</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {sortedProducts.map((product, index) => (
+              <div
+                key={product.id}
+                onClick={() => handleProductClick(product.id)}
+                className={cn(
+                  "relative p-4 rounded-lg border bg-gradient-to-r transition-all duration-200 hover:shadow-md cursor-pointer group",
+                  getRankColor(product.rank)
+                )}
+              >
+                <div className="flex items-center gap-4">
+                  {/* Rank & Product Image */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center">
+                      {getRankIcon(product.rank)}
+                    </div>
+                    <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center text-lg">
+                      ☕
+                    </div>
+                  </div>
+                  
+                  {/* Product Info */}
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
+                      {product.name}
+                    </h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {product.category}
+                    </p>
+                    
+                    {/* Trend Indicator */}
+                    <div className="flex items-center gap-1 mt-1">
+                      <TrendingUp className={cn(
+                        "w-3 h-3",
+                        product.trend === 'up' ? 'text-green-500' : 
+                        product.trend === 'down' ? 'text-red-500 rotate-180' : 
+                        'text-gray-400'
+                      )} />
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                        {product.trend}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Metrics */}
+                  <div className="text-right">
+                    <div className="space-y-1">
+                      <div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Sales</p>
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                          {product.sales}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Revenue</p>
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                          {formatCurrency(product.revenue)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Change Badge */}
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge 
+                      variant={product.changePercentage >= 0 ? "default" : "destructive"}
+                      className="text-xs"
+                    >
+                      {product.changePercentage >= 0 ? '+' : ''}{product.changePercentage.toFixed(1)}%
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto"
+                    >
+                      <Eye className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Hover overlay for top 3 */}
+                {product.rank <= 3 && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-white/10 dark:via-gray-800/5 dark:to-gray-800/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg pointer-events-none" />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         
         {/* View All Products Button */}
         <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
@@ -279,6 +264,13 @@ const TopProductsCard: React.FC = () => {
           </Button>
         </div>
       </CardContent>
+
+      {/* Product Detail Modal */}
+      <ProductDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        product={selectedProduct}
+      />
     </Card>
   );
 };

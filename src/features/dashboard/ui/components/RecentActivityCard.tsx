@@ -8,140 +8,53 @@ import {
   Package,
   DollarSign,
   Clock,
-  CheckCircle,
-  AlertCircle,
+  UserPlus,
   MoreHorizontal
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../shared/ui/card';
 import { Button } from '../../../../shared/ui/button';
 import { Badge } from '../../../../shared/ui/badge';
 import { cn } from '../../../../core/utils/cn';
-
-interface ActivityItem {
-  id: string;
-  type: 'order' | 'customer' | 'product' | 'payment';
-  title: string;
-  description: string;
-  timestamp: Date;
-  status: 'success' | 'pending' | 'warning';
-  amount?: number;
-  user?: string;
-}
+import { useRecentActivities } from '../../../../infra/api/hooks/dashboardHooks';
 
 const RecentActivityCard: React.FC = () => {
-  // Mock data - replace with real data from your API
-  const activities: ActivityItem[] = [
-    {
-      id: '1',
-      type: 'order',
-      title: 'New Order Received',
-      description: 'Order #ORD-2024-001 placed by John Doe',
-      timestamp: new Date(Date.now() - 5 * 60 * 1000),
-      status: 'success',
-      amount: 45.50,
-      user: 'John Doe'
-    },
-    {
-      id: '2',
-      type: 'product',
-      title: 'Low Stock Alert',
-      description: 'Colombian Supremo beans running low (8 units left)',
-      timestamp: new Date(Date.now() - 15 * 60 * 1000),
-      status: 'warning'
-    },
-    {
-      id: '3',
-      type: 'payment',
-      title: 'Payment Received',
-      description: 'Payment for Order #ORD-2024-002 processed',
-      timestamp: new Date(Date.now() - 32 * 60 * 1000),
-      status: 'success',
-      amount: 78.25
-    },
-    {
-      id: '4',
-      type: 'customer',
-      title: 'New Customer Registration',
-      description: 'Sarah Wilson joined the Coffee House community',
-      timestamp: new Date(Date.now() - 45 * 60 * 1000),
-      status: 'success',
-      user: 'Sarah Wilson'
-    },
-    {
-      id: '5',
-      type: 'order',
-      title: 'Order Processing',
-      description: 'Order #ORD-2024-003 is being prepared',
-      timestamp: new Date(Date.now() - 67 * 60 * 1000),
-      status: 'pending',
-      amount: 32.75
-    }
-  ];
+  const { activities, loading, error } = useRecentActivities(10);
 
-  const getActivityIcon = (type: ActivityItem['type']) => {
-    const iconMap = {
-      order: ShoppingCart,
-      customer: Users,
-      product: Package,
-      payment: DollarSign
+  const getActivityIcon = (iconName: string) => {
+    const iconMap: Record<string, any> = {
+      'ShoppingCart': ShoppingCart,
+      'UserPlus': UserPlus,
+      'Package': Package,
+      'DollarSign': DollarSign,
+      'Activity': Activity
     };
-    return iconMap[type];
+    return iconMap[iconName] || Activity;
   };
 
-  const getActivityColor = (type: ActivityItem['type'], status: ActivityItem['status']) => {
-    if (status === 'warning') {
-      return {
+  const getActivityColor = (type: string) => {
+    const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+      'order': {
+        bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+        text: 'text-emerald-600 dark:text-emerald-400',
+        border: 'border-emerald-200 dark:border-emerald-800'
+      },
+      'user': {
+        bg: 'bg-blue-50 dark:bg-blue-900/20',
+        text: 'text-blue-600 dark:text-blue-400',
+        border: 'border-blue-200 dark:border-blue-800'
+      },
+      'product': {
         bg: 'bg-amber-50 dark:bg-amber-900/20',
         text: 'text-amber-600 dark:text-amber-400',
         border: 'border-amber-200 dark:border-amber-800'
-      };
-    }
-    
-    if (status === 'pending') {
-      return {
-        bg: 'bg-blue-50 dark:bg-blue-900/20',
-        text: 'text-blue-600 dark:text-blue-400',
-        border: 'border-blue-200 dark:border-blue-800'
-      };
-    }
-
-    const colorMap = {
-      order: {
-        bg: 'bg-emerald-50 dark:bg-emerald-900/20',
-        text: 'text-emerald-600 dark:text-emerald-400',
-        border: 'border-emerald-200 dark:border-emerald-800'
       },
-      customer: {
+      'inventory': {
         bg: 'bg-purple-50 dark:bg-purple-900/20',
         text: 'text-purple-600 dark:text-purple-400',
         border: 'border-purple-200 dark:border-purple-800'
-      },
-      product: {
-        bg: 'bg-blue-50 dark:bg-blue-900/20',
-        text: 'text-blue-600 dark:text-blue-400',
-        border: 'border-blue-200 dark:border-blue-800'
-      },
-      payment: {
-        bg: 'bg-emerald-50 dark:bg-emerald-900/20',
-        text: 'text-emerald-600 dark:text-emerald-400',
-        border: 'border-emerald-200 dark:border-emerald-800'
       }
     };
-    
-    return colorMap[type];
-  };
-
-  const getStatusIcon = (status: ActivityItem['status']) => {
-    switch (status) {
-      case 'success':
-        return CheckCircle;
-      case 'warning':
-        return AlertCircle;
-      case 'pending':
-        return Clock;
-      default:
-        return CheckCircle;
-    }
+    return colorMap[type] || colorMap['order'];
   };
 
   const formatTimeAgo = (timestamp: Date) => {
@@ -155,13 +68,6 @@ const RecentActivityCard: React.FC = () => {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
   };
 
   return (
@@ -187,80 +93,71 @@ const RecentActivityCard: React.FC = () => {
       </CardHeader>
       
       <CardContent>
-        <div className="space-y-4">
-          {activities.map((activity, index) => {
-            const IconComponent = getActivityIcon(activity.type);
-            const StatusIcon = getStatusIcon(activity.status);
-            const colors = getActivityColor(activity.type, activity.status);
-            
-            return (
-              <div key={activity.id} className="flex items-start gap-4 group">
-                {/* Icon */}
-                <div className={cn(
-                  "w-10 h-10 rounded-lg flex items-center justify-center border transition-all duration-200 group-hover:scale-105",
-                  colors.bg,
-                  colors.border
-                )}>
-                  <IconComponent className={cn("w-5 h-5", colors.text)} />
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-start gap-4 animate-pulse">
+                <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                 </div>
-                
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900 dark:text-white text-sm">
-                        {activity.title}
-                      </h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {activity.description}
-                      </p>
-                      
-                      {/* Additional info */}
-                      <div className="flex items-center gap-3 mt-2">
-                        <div className="flex items-center gap-1">
-                          <StatusIcon className={cn("w-3 h-3", colors.text)} />
-                          <span className="text-xs text-gray-500 dark:text-gray-500 capitalize">
-                            {activity.status}
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-red-600 mb-2">Failed to load activities</p>
+            <p className="text-xs text-gray-500">{error}</p>
+          </div>
+        ) : activities.length === 0 ? (
+          <div className="text-center py-8">
+            <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No recent activity</p>
+          </div>
+        ) : (
+          <div className="space-y-4 max-h-[400px] overflow-y-auto">
+            {activities.map((activity) => {
+              const IconComponent = getActivityIcon(activity.icon);
+              const colors = getActivityColor(activity.type);
+              
+              return (
+                <div key={activity.id} className="flex items-start gap-4 group hover:bg-gray-50 dark:hover:bg-gray-700/50 p-2 rounded-lg transition-colors">
+                  {/* Icon */}
+                  <div className={cn(
+                    "w-10 h-10 rounded-lg flex items-center justify-center border transition-all duration-200 group-hover:scale-105",
+                    colors.bg,
+                    colors.border
+                  )}>
+                    <IconComponent className={cn("w-5 h-5", colors.text)} />
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 dark:text-white text-sm">
+                          {activity.title}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                          {activity.description}
+                        </p>
+                        
+                        {/* Timestamp */}
+                        <div className="flex items-center gap-2 mt-2">
+                          <Clock className="w-3 h-3 text-gray-400" />
+                          <span className="text-xs text-gray-500">
+                            {formatTimeAgo(activity.timestamp)}
                           </span>
                         </div>
-                        
-                        {activity.amount && (
-                          <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                            {formatCurrency(activity.amount)}
-                          </span>
-                        )}
-                        
-                        {activity.user && (
-                          <span className="text-xs text-gray-500 dark:text-gray-500">
-                            by {activity.user}
-                          </span>
-                        )}
                       </div>
-                    </div>
-                    
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xs text-gray-500 dark:text-gray-500">
-                        {formatTimeAgo(activity.timestamp)}
-                      </p>
                     </div>
                   </div>
                 </div>
-                
-                {/* Timeline connector */}
-                {index < activities.length - 1 && (
-                  <div className="absolute left-5 top-12 w-0.5 h-6 bg-gray-200 dark:bg-gray-700" />
-                )}
-              </div>
-            );
-          })}
-        </div>
-        
-        {/* View All Button */}
-        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-          <Button variant="outline" className="w-full">
-            View All Activity
-          </Button>
-        </div>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

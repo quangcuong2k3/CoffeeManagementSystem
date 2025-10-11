@@ -20,7 +20,8 @@ import {
   Eye,
   BarChart3,
   PieChart,
-  LineChart
+  LineChart,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../shared/ui/card';
 import { Button } from '../../../../shared/ui/button';
@@ -31,6 +32,7 @@ import AlertsCard from './AlertsCard';
 import RecentActivityCard from './RecentActivityCard';
 import SalesChart from './SalesChart';
 import TopProductsCard from './TopProductsCard';
+import { useDashboardStats, useDashboardAlerts } from '../../../../infra/api/hooks/dashboardHooks';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -46,20 +48,11 @@ interface DashboardStats {
 }
 
 const DashboardContent: React.FC = () => {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalRevenue: 45230.50,
-    revenueChange: 12.5,
-    totalOrders: 1247,
-    ordersChange: 8.3,
-    activeCustomers: 892,
-    customersChange: -2.1,
-    totalProducts: 45,
-    productsChange: 5.2,
-    lowStockItems: 3,
-    pendingOrders: 12
-  });
-
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Fetch real dashboard data
+  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats();
+  const { alerts, loading: alertsLoading } = useDashboardAlerts();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -118,92 +111,136 @@ const DashboardContent: React.FC = () => {
             </div>
           </div>
           
+          <Button 
+            onClick={refetchStats}
+            variant="outline"
+            className="flex items-center gap-2"
+            disabled={statsLoading}
+          >
+            <RefreshCw className={`w-4 h-4 ${statsLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          
           <Button className="btn-coffee shadow-lg">
             <Bell className="w-4 h-4 mr-2" />
             Notifications
-            <Badge variant="destructive" className="ml-2 animate-pulse">3</Badge>
+            {alerts && alerts.length > 0 && (
+              <Badge variant="destructive" className="ml-2 animate-pulse">{alerts.length}</Badge>
+            )}
           </Button>
         </div>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          <StatsCard
-            title="Total Revenue"
-            value={formatCurrency(stats.totalRevenue)}
-            change={stats.revenueChange}
-            icon={DollarSign}
-            trend="up"
-            description="from last month"
-            color="emerald"
-          />
+      {/* Loading State */}
+      {statsLoading && !stats ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        
-        <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <StatsCard
-            title="Total Orders"
-            value={stats.totalOrders.toLocaleString()}
-            change={stats.ordersChange}
-            icon={ShoppingCart}
-            trend="up"
-            description="from last month"
-            color="blue"
-          />
-        </div>
-        
-        <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
-          <StatsCard
-            title="Active Customers"
-            value={stats.activeCustomers.toLocaleString()}
-            change={stats.customersChange}
-            icon={Users}
-            trend="down"
-            description="from last month"
-            color="purple"
-          />
-        </div>
-        
-        <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
-          <StatsCard
-            title="Products"
-            value={stats.totalProducts.toString()}
-            change={stats.productsChange}
-            icon={Package}
-            trend="up"
-            description="total products"
-            color="amber"
-          />
-        </div>
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Sales Chart - Takes up 2 columns */}
-        <div className="xl:col-span-2 animate-fade-in" style={{ animationDelay: '0.5s' }}>
-          <SalesChart />
-        </div>
-        
-        {/* Quick Actions */}
-        <div className="space-y-6">
-          <div className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
-            <QuickActionsCard />
+      ) : statsError ? (
+        <Card className="p-8 bg-red-50 border-red-200">
+          <div className="flex items-center justify-center text-center">
+            <div>
+              <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Dashboard</h3>
+              <p className="text-red-600 mb-4">{statsError}</p>
+              <Button onClick={refetchStats} className="bg-red-600 hover:bg-red-700 text-white">
+                Try Again
+              </Button>
+            </div>
           </div>
-          <div className="animate-fade-in" style={{ animationDelay: '0.7s' }}>
-            <AlertsCard lowStockItems={stats.lowStockItems} pendingOrders={stats.pendingOrders} />
+        </Card>
+      ) : stats ? (
+        <>
+          {/* Stats Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
+              <StatsCard
+                title="Total Revenue"
+                value={formatCurrency(stats.totalRevenue)}
+                change={stats.revenueChange}
+                icon={DollarSign}
+                trend={stats.revenueChange >= 0 ? 'up' : 'down'}
+                description="from last month"
+                color="emerald"
+              />
+            </div>
+            
+            <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              <StatsCard
+                title="Total Orders"
+                value={stats.totalOrders.toLocaleString()}
+                change={stats.ordersChange}
+                icon={ShoppingCart}
+                trend={stats.ordersChange >= 0 ? 'up' : 'down'}
+                description="from last month"
+                color="blue"
+              />
+            </div>
+            
+            <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
+              <StatsCard
+                title="Active Customers"
+                value={stats.activeCustomers.toLocaleString()}
+                change={stats.customersChange}
+                icon={Users}
+                trend={stats.customersChange >= 0 ? 'up' : 'down'}
+                description="from last month"
+                color="purple"
+              />
+            </div>
+            
+            <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
+              <StatsCard
+                title="Products"
+                value={stats.totalProducts.toString()}
+                change={stats.productsChange}
+                icon={Package}
+                trend={stats.productsChange >= 0 ? 'up' : 'down'}
+                description="total products"
+                color="amber"
+              />
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="animate-fade-in" style={{ animationDelay: '0.8s' }}>
-          <RecentActivityCard />
-        </div>
-        <div className="animate-fade-in" style={{ animationDelay: '0.9s' }}>
-          <TopProductsCard />
-        </div>
-      </div>
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Sales Chart - Takes up 2 columns */}
+            <div className="xl:col-span-2 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+              <SalesChart />
+            </div>
+            
+            {/* Quick Actions */}
+            <div className="space-y-6">
+              <div className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
+                <QuickActionsCard />
+              </div>
+              {/* <div className="animate-fade-in" style={{ animationDelay: '0.7s' }}>
+                <AlertsCard lowStockItems={stats.lowStockItems} pendingOrders={stats.pendingOrders} />
+              </div> */}
+            </div>
+          </div>
+
+          {/* Bottom Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="animate-fade-in" style={{ animationDelay: '0.8s' }}>
+              <RecentActivityCard />
+            </div>
+            <div className="animate-fade-in" style={{ animationDelay: '0.9s' }}>
+              <TopProductsCard />
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 };

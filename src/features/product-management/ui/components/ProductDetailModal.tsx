@@ -1,13 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../../shared/ui/dialog';
 import { Button } from '../../../../shared/ui/button';
 import { Badge } from '../../../../shared/ui/badge';
 import { Card, CardContent } from '../../../../shared/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../shared/ui/tabs';
 import { FirebaseImage } from '../../../../shared/ui/firebase-image';
 import { formatPrice } from '../../../../shared/lib/currency';
 import { Product } from '../../../../entities/product/types';
+import { ProductReviews } from './ProductReviews';
 import { 
   Coffee, 
   Leaf, 
@@ -18,7 +20,8 @@ import {
   Calendar,
   Edit,
   Trash2,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '../../../../shared/lib/utils';
 
@@ -86,7 +89,20 @@ export function ProductDetailModal({
           </Button>
         </DialogHeader>
 
-        <div className="p-6 space-y-6">
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="details" className="flex items-center gap-2">
+              <Info className="w-4 h-4" />
+              Product Details
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Reviews
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="mt-6">
+            <div className="space-y-6">{/* Existing product details content will go here */}
           {/* Images and Basic Info */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Images */}
@@ -256,7 +272,13 @@ export function ProductDetailModal({
               </Button>
             )}
           </div>
-        </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="reviews" className="mt-6">
+            <ProductReviews productId={product.id} />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
