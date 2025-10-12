@@ -119,7 +119,17 @@ export class ProductRepository {
     try {
       const now = new Date();
       const product = {
-        ...productData,
+        name: productData.name,
+        description: productData.description,
+        roasted: productData.roasted,
+        ingredients: productData.ingredients,
+        special_ingredient: productData.special_ingredient,
+        type: productData.type,
+        category: productData.category,
+        prices: productData.prices,
+        // Map image URLs to the correct field names
+        imageUrlSquare: productData.images.square,
+        imageUrlPortrait: productData.images.portrait,
         average_rating: 0,
         ratings_count: '0',
         favourite: false,
@@ -142,10 +152,24 @@ export class ProductRepository {
   async updateProduct(id: string, productData: Partial<ProductFormData>): Promise<void> {
     try {
       const docRef = doc(firestore, this.collectionName, id);
-      await updateDoc(docRef, {
+      
+      // Convert ProductFormData to Product format
+      const updateFields: any = {
         ...productData,
         updatedAt: new Date(),
-      });
+      };
+
+      // Map image URLs if provided
+      if (productData.images) {
+        updateFields.imageUrlSquare = productData.images.square;
+        updateFields.imageUrlPortrait = productData.images.portrait;
+        delete updateFields.images; // Remove the images object
+      }
+
+      // Remove imageFiles if present (not stored in Firestore)
+      delete updateFields.imageFiles;
+
+      await updateDoc(docRef, updateFields);
     } catch (error) {
       console.error('Error updating product:', error);
       throw new Error('Failed to update product');

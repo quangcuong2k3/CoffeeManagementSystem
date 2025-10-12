@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { productService } from '../service';
-import { Product, ProductFormData, ProductFilters } from '../../../entities/product/types';
+import { Product, ProductFormData, ProductFormDataWithFiles, ProductFilters } from '../../../entities/product/types';
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);

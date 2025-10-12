@@ -161,14 +161,14 @@ export function AddEditProductModal({
     setIsLoading(true);
 
     try {
-      // Here you would implement the Firebase Storage upload logic
-      // For now, we'll use the existing image URLs or preview URLs
-      const finalFormData = {
+      // Include both image URLs and File objects for upload
+      const finalFormData: ProductFormData = {
         ...formData,
         images: {
-          square: imagePreviewUrls.square || formData.images.square,
-          portrait: imagePreviewUrls.portrait || formData.images.portrait
-        }
+          square: formData.images.square || '',
+          portrait: formData.images.portrait || ''
+        },
+        imageFiles: imageFiles // Pass the actual File objects for Firebase Storage upload
       };
 
       await onSave(finalFormData);

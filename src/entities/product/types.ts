@@ -43,6 +43,11 @@ export interface ProductFormData {
     square: string;
     portrait: string;
   };
+  // Optional file fields for image upload
+  imageFiles?: {
+    square?: File;
+    portrait?: File;
+  };
 }
 
 export interface ProductFilters {

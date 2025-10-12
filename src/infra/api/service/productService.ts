@@ -1,5 +1,6 @@
 import { Product, ProductFormData, ProductFilters, ProductSearchResult } from '../../../entities/product/types';
 import { productRepository } from '../../../entities/product/repository';
+import { firebaseStorageService } from './firebaseStorageService';
 
 /**
  * Product Service - Business Logic Layer
@@ -53,8 +54,8 @@ export class ProductService {
    * Create a new product with validation
    */
   async createProduct(productData: ProductFormData): Promise<string> {
-    // Validate required fields
-    this.validateProductData(productData);
+    // Validate required fields (for creation)
+    this.validateProductData(productData, false);
 
     // Business rule: Check for duplicate product names
     const existingProducts = await productRepository.searchProducts(productData.name);
@@ -69,7 +70,49 @@ export class ProductService {
     // Business rule: Validate price data
     this.validatePrices(productData.prices);
 
-    return await productRepository.createProduct(productData);
+    // First, create the product to get an ID (without images)
+    const tempProductData = {
+      ...productData,
+      images: {
+        square: '',
+        portrait: ''
+      }
+    };
+    delete tempProductData.imageFiles; // Remove imageFiles from the data sent to Firestore
+
+    const productId = await productRepository.createProduct(tempProductData);
+
+    // Now upload images using the generated product ID
+    try {
+      if (productData.imageFiles && (productData.imageFiles.square || productData.imageFiles.portrait)) {
+        console.log('Uploading images for product:', productId);
+        
+        const imageUrls = await firebaseStorageService.uploadProductImages(
+          productData.imageFiles,
+          productId,
+          productData.category
+        );
+
+        console.log('Image upload results:', imageUrls);
+
+        // Update product with uploaded image URLs
+        const updateData: Partial<ProductFormData> = {
+          images: {
+            square: imageUrls.square || '',
+            portrait: imageUrls.portrait || ''
+          }
+        };
+
+        await productRepository.updateProduct(productId, updateData);
+        console.log('Product updated with image URLs');
+      }
+    } catch (error) {
+      console.error('Error uploading product images:', error);
+      // Throw the error so the user knows there was an issue
+      throw new Error(`Product created but failed to upload images: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    return productId;
   }
 
   /**
@@ -87,6 +130,27 @@ export class ProductService {
     }
 
     // Validate updated data
+    if (productData.name || productData.description || productData.type || productData.category) {
+      // Create a complete object for validation if key fields are being updated
+      const validationData: ProductFormData = {
+        name: productData.name || existingProduct.name,
+        description: productData.description || existingProduct.description,
+        roasted: productData.roasted || existingProduct.roasted,
+        ingredients: productData.ingredients || existingProduct.ingredients,
+        special_ingredient: productData.special_ingredient || existingProduct.special_ingredient,
+        type: productData.type || existingProduct.type,
+        category: productData.category || existingProduct.category,
+        prices: productData.prices || existingProduct.prices,
+        images: productData.images || {
+          square: existingProduct.imageUrlSquare,
+          portrait: existingProduct.imageUrlPortrait
+        },
+        imageFiles: productData.imageFiles
+      };
+      
+      this.validateProductData(validationData, true);
+    }
+    
     if (productData.prices) {
       this.validatePrices(productData.prices);
     }
@@ -103,7 +167,74 @@ export class ProductService {
       }
     }
 
-    await productRepository.updateProduct(id, productData);
+    // Prepare update data
+    const updateData = { ...productData };
+    
+    try {
+      // Handle image uploads if new images are provided
+      if (productData.imageFiles && (productData.imageFiles.square || productData.imageFiles.portrait)) {
+        console.log('Updating product images for:', id);
+        
+        // Delete old images if they exist and new ones are being uploaded
+        if (existingProduct.imageUrlSquare && productData.imageFiles.square) {
+          const oldSquarePath = firebaseStorageService.extractImagePath(existingProduct.imageUrlSquare);
+          if (oldSquarePath) {
+            try {
+              await firebaseStorageService.deleteProductImage(oldSquarePath);
+              console.log('Deleted old square image');
+            } catch (error) {
+              console.warn('Failed to delete old square image:', error);
+            }
+          }
+        }
+        
+        if (existingProduct.imageUrlPortrait && productData.imageFiles.portrait) {
+          const oldPortraitPath = firebaseStorageService.extractImagePath(existingProduct.imageUrlPortrait);
+          if (oldPortraitPath) {
+            try {
+              await firebaseStorageService.deleteProductImage(oldPortraitPath);
+              console.log('Deleted old portrait image');
+            } catch (error) {
+              console.warn('Failed to delete old portrait image:', error);
+            }
+          }
+        }
+
+        // Upload new images
+        const imageUrls = await firebaseStorageService.uploadProductImages(
+          productData.imageFiles,
+          id,
+          existingProduct.category
+        );
+
+        console.log('New image URLs:', imageUrls);
+
+        // Initialize images object if it doesn't exist
+        if (!updateData.images) {
+          updateData.images = {
+            square: existingProduct.imageUrlSquare || '',
+            portrait: existingProduct.imageUrlPortrait || ''
+          };
+        }
+        
+        // Update with new image URLs
+        if (imageUrls.square) {
+          updateData.images.square = imageUrls.square;
+        }
+        if (imageUrls.portrait) {
+          updateData.images.portrait = imageUrls.portrait;
+        }
+      }
+
+      // Remove imageFiles from update data as it's not part of the Firestore schema
+      delete updateData.imageFiles;
+
+      await productRepository.updateProduct(id, updateData);
+      console.log('Product updated successfully');
+    } catch (error) {
+      console.error('Error updating product with images:', error);
+      throw new Error(`Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**
@@ -182,7 +313,7 @@ export class ProductService {
 
   // Private helper methods
 
-  private validateProductData(productData: ProductFormData): void {
+  private validateProductData(productData: ProductFormData, isUpdate: boolean = false): void {
     if (!productData.name || productData.name.trim() === '') {
       throw new Error('Product name is required');
     }
@@ -201,6 +332,20 @@ export class ProductService {
 
     if (!productData.prices || productData.prices.length === 0) {
       throw new Error('At least one price must be specified');
+    }
+
+    // Only validate images for new products, not updates
+    if (!isUpdate) {
+      const hasNewSquareImage = productData.imageFiles?.square;
+      const hasNewPortraitImage = productData.imageFiles?.portrait;
+
+      if (!hasNewSquareImage) {
+        throw new Error('Square image is required. Please upload a square format image.');
+      }
+
+      if (!hasNewPortraitImage) {
+        throw new Error('Portrait image is required. Please upload a portrait format image.');
+      }
     }
   }
 

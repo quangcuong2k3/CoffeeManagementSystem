@@ -34,6 +34,8 @@ import {
 
 export class FirestoreOrderRepository implements OrderRepository {
   private collectionName = 'orders';
+  private usersCollection = 'users';
+  private userCache = new Map<string, Customer>();
 
   async findAll(filters?: OrderFilters, page = 1, limit = 20): Promise<OrderSearchResult> {
     try {
@@ -56,7 +58,8 @@ export class FirestoreOrderRepository implements OrderRepository {
       q = query(collection(firestore, this.collectionName), firestoreLimit(200));
 
       const querySnapshot = await getDocs(q);
-      let orders = querySnapshot.docs.map(doc => this.mapFirestoreDocToOrder(doc));
+      const orderPromises = querySnapshot.docs.map(doc => this.mapFirestoreDocToOrder(doc));
+      let orders = await Promise.all(orderPromises);
 
       // Apply all filtering client-side to completely avoid index requirements
       orders = this.applyClientSideFilters(orders, filters);
@@ -132,7 +135,8 @@ export class FirestoreOrderRepository implements OrderRepository {
       q = query(q, orderBy('orderDate', 'desc'));
       
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => this.mapFirestoreDocToOrder(doc));
+      const orderPromises = querySnapshot.docs.map(doc => this.mapFirestoreDocToOrder(doc));
+      return Promise.all(orderPromises);
     } catch (error) {
       console.error('Error fetching customer orders:', error);
       throw new Error('Failed to fetch customer orders');
@@ -205,7 +209,8 @@ export class FirestoreOrderRepository implements OrderRepository {
       }
 
       const querySnapshot = await getDocs(q);
-      const orders = querySnapshot.docs.map(doc => this.mapFirestoreDocToOrder(doc));
+      const orderPromises = querySnapshot.docs.map(doc => this.mapFirestoreDocToOrder(doc));
+      const orders = await Promise.all(orderPromises);
 
       return this.calculateStatsFromOrders(orders);
     } catch (error) {
@@ -223,29 +228,25 @@ export class FirestoreOrderRepository implements OrderRepository {
       );
       
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => this.mapFirestoreDocToOrder(doc));
+      const orderPromises = querySnapshot.docs.map(doc => this.mapFirestoreDocToOrder(doc));
+      return Promise.all(orderPromises);
     } catch (error) {
       console.error('Error fetching recent orders:', error);
       throw new Error('Failed to fetch recent orders');
     }
   }
 
-  private mapFirestoreDocToOrder(doc: DocumentSnapshot): Order {
+  private async mapFirestoreDocToOrder(doc: DocumentSnapshot): Promise<Order> {
     const data = doc.data()!;
+    
+    // Fetch customer information from users collection
+    const customer = await this.fetchCustomerInfo(data.userId);
     
     // Map Firestore document to Order interface
     return {
       id: doc.id,
       orderNumber: data.orderNumber || `ORD-${doc.id.slice(-4).toUpperCase()}`,
-      customer: {
-        id: data.userId || 'unknown',
-        name: data.customerName || data.userName || 'Unknown Customer',
-        email: data.customerEmail || data.userEmail || undefined,
-        phone: data.customerPhone || data.userPhone || undefined,
-        loyaltyLevel: this.mapLoyaltyLevel(data.customerLoyalty || 'bronze'),
-        totalOrders: data.customerTotalOrders || 1,
-        avatar: data.customerAvatar || ''
-      },
+      customer,
       items: this.mapOrderItems(data.items || data.cartItems || []),
       status: this.mapOrderStatus(data.status || 'pending'),
       payment: {
@@ -269,6 +270,57 @@ export class FirestoreOrderRepository implements OrderRepository {
       updatedAt: data.updatedAt?.toDate() || new Date(),
       completedAt: data.completedAt?.toDate(),
       assignedStaff: data.assignedStaff
+    };
+  }
+
+  /**
+   * Fetch customer information from users collection
+   */
+  private async fetchCustomerInfo(userId: string | undefined): Promise<Customer> {
+    // Return cached customer if available
+    if (userId && this.userCache.has(userId)) {
+      return this.userCache.get(userId)!;
+    }
+
+    // If no userId, return unknown customer
+    if (!userId) {
+      return {
+        id: 'unknown',
+        name: 'Unknown Customer',
+        loyaltyLevel: 'bronze',
+        totalOrders: 0
+      };
+    }
+
+    try {
+      const userDoc = await getDoc(doc(firestore, this.usersCollection, userId));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const customer: Customer = {
+          id: userDoc.id,
+          name: userData.displayName || userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown Customer',
+          email: userData.email,
+          phone: userData.phoneNumber || userData.phone,
+          loyaltyLevel: this.mapLoyaltyLevel(userData.membershipTier || userData.loyaltyLevel || 'bronze'),
+          totalOrders: userData.totalOrders || 0,
+          avatar: userData.profileImageUrl || userData.photoURL || userData.avatar
+        };
+
+        // Cache the customer info
+        this.userCache.set(userId, customer);
+        return customer;
+      }
+    } catch (error) {
+      console.error(`Error fetching user data for userId ${userId}:`, error);
+    }
+
+    // Fallback if user not found
+    return {
+      id: userId,
+      name: 'Unknown Customer',
+      loyaltyLevel: 'bronze',
+      totalOrders: 0
     };
   }
 
